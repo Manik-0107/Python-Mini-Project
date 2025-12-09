@@ -13,7 +13,8 @@ for f in os.listdir(path):
 
 
 
+
 """
-Folder: E:\New folder
+Folder: E:\\New folder
 Duplicate File:  New Text Document.txt <-> New Text Document (2).txt
 """
