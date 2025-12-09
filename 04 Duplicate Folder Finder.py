@@ -10,11 +10,3 @@ for f in os.listdir(path):
         print("Duplicate File: ", f, "<->", seen[h])
     else:
         seen[h] = f
-
-
-
-
-"""
-Folder: E:\\New folder
-Duplicate File:  New Text Document.txt <-> New Text Document (2).txt
-"""
