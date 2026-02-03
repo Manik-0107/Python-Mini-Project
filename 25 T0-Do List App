@@ -1,0 +1,741 @@
+# Project Name: To-Do List App
+
+import tkinter as tk
+from tkinter import ttk, messagebox, font
+from datetime import datetime, timedelta
+import json
+import os
+
+
+class EnhancedTodoApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("🌟 Productivity Pro - To-Do List")
+        self.root.geometry("900x700")
+        self.root.configure(bg='#f0f2f5')
+
+        # Load saved tasks
+        self.tasks_file = "tasks.json"
+        self.tasks = self.load_tasks()
+
+        # Colors
+        self.colors = {
+            'bg': '#f0f2f5',
+            'card_bg': '#ffffff',
+            'primary': '#4a6fa5',
+            'secondary': '#6c757d',
+            'success': '#28a745',
+            'danger': '#dc3545',
+            'warning': '#ffc107',
+            'info': '#17a2b8',
+            'light': '#f8f9fa',
+            'dark': '#343a40'
+        }
+
+        # Configure styles
+        self.setup_styles()
+
+        # Setup UI
+        self.setup_ui()
+
+        # Load initial tasks
+        self.load_tasks_to_listbox()
+
+        # Update statistics
+        self.update_stats()
+
+    def setup_styles(self):
+        """Configure ttk styles"""
+        style = ttk.Style()
+        style.theme_use('clam')
+
+        # Configure button styles
+        style.configure('Primary.TButton',
+                        background=self.colors['primary'],
+                        foreground='white',
+                        borderwidth=1,
+                        focusthickness=3,
+                        focuscolor='none',
+                        font=('Segoe UI', 10, 'bold'))
+
+        style.configure('Success.TButton',
+                        background=self.colors['success'],
+                        foreground='white')
+
+        style.configure('Danger.TButton',
+                        background=self.colors['danger'],
+                        foreground='white')
+
+        style.configure('Warning.TButton',
+                        background=self.colors['warning'],
+                        foreground='black')
+
+    def setup_ui(self):
+        """Setup the user interface"""
+        # Header
+        header_frame = tk.Frame(self.root, bg=self.colors['primary'], height=80)
+        header_frame.pack(fill='x')
+        header_frame.pack_propagate(False)
+
+        # App title
+        title_label = tk.Label(header_frame,
+                               text="📝 Productivity Pro",
+                               font=('Segoe UI', 24, 'bold'),
+                               fg='white',
+                               bg=self.colors['primary'])
+        title_label.pack(side='left', padx=30, pady=20)
+
+        # Date display
+        self.date_label = tk.Label(header_frame,
+                                   text=datetime.now().strftime("%A, %B %d, %Y"),
+                                   font=('Segoe UI', 12),
+                                   fg='white',
+                                   bg=self.colors['primary'])
+        self.date_label.pack(side='right', padx=30, pady=20)
+
+        # Main container
+        main_container = tk.Frame(self.root, bg=self.colors['bg'])
+        main_container.pack(fill='both', expand=True, padx=20, pady=20)
+
+        # Left panel - Task input and statistics
+        left_panel = tk.Frame(main_container, bg=self.colors['card_bg'], relief='raised', bd=2)
+        left_panel.pack(side='left', fill='both', padx=(0, 10))
+
+        # Task input section
+        input_frame = tk.LabelFrame(left_panel,
+                                    text="➕ Add New Task",
+                                    font=('Segoe UI', 12, 'bold'),
+                                    bg=self.colors['card_bg'],
+                                    fg=self.colors['primary'],
+                                    padx=15,
+                                    pady=15)
+        input_frame.pack(fill='x', padx=15, pady=15)
+
+        # Task description
+        tk.Label(input_frame,
+                 text="Task Description:",
+                 font=('Segoe UI', 10, 'bold'),
+                 bg=self.colors['card_bg']).grid(row=0, column=0, sticky='w', pady=(0, 5))
+
+        self.task_entry = tk.Text(input_frame,
+                                  height=3,
+                                  width=30,
+                                  font=('Segoe UI', 10),
+                                  bg=self.colors['light'],
+                                  relief='solid',
+                                  bd=1)
+        self.task_entry.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+
+        # Priority selection
+        tk.Label(input_frame,
+                 text="Priority:",
+                 font=('Segoe UI', 10, 'bold'),
+                 bg=self.colors['card_bg']).grid(row=2, column=0, sticky='w', pady=(0, 5))
+
+        self.priority_var = tk.StringVar(value="Medium")
+        priority_frame = tk.Frame(input_frame, bg=self.colors['card_bg'])
+        priority_frame.grid(row=3, column=0, columnspan=2, pady=(0, 10))
+
+        priorities = [("🔥 High", "High"), ("⚡ Medium", "Medium"), ("💡 Low", "Low")]
+        for text, value in priorities:
+            rb = tk.Radiobutton(priority_frame,
+                                text=text,
+                                variable=self.priority_var,
+                                value=value,
+                                font=('Segoe UI', 9),
+                                bg=self.colors['card_bg'])
+            rb.pack(side='left', padx=5)
+
+        # Due date
+        tk.Label(input_frame,
+                 text="Due Date (Optional):",
+                 font=('Segoe UI', 10, 'bold'),
+                 bg=self.colors['card_bg']).grid(row=4, column=0, sticky='w', pady=(0, 5))
+
+        self.due_date_var = tk.StringVar()
+        due_date_entry = tk.Entry(input_frame,
+                                  textvariable=self.due_date_var,
+                                  font=('Segoe UI', 10),
+                                  bg=self.colors['light'],
+                                  relief='solid',
+                                  bd=1)
+        due_date_entry.grid(row=5, column=0, columnspan=2, pady=(0, 15))
+        due_date_entry.insert(0, datetime.now().strftime("%Y-%m-%d"))
+
+        # Category
+        tk.Label(input_frame,
+                 text="Category:",
+                 font=('Segoe UI', 10, 'bold'),
+                 bg=self.colors['card_bg']).grid(row=6, column=0, sticky='w', pady=(0, 5))
+
+        self.category_var = tk.StringVar(value="General")
+        categories = ["Work", "Personal", "Shopping", "Health", "Learning", "General"]
+        category_combo = ttk.Combobox(input_frame,
+                                      textvariable=self.category_var,
+                                      values=categories,
+                                      state="readonly",
+                                      font=('Segoe UI', 10),
+                                      width=27)
+        category_combo.grid(row=7, column=0, columnspan=2, pady=(0, 20))
+
+        # Add task button
+        add_btn = ttk.Button(input_frame,
+                             text="➕ Add Task",
+                             style='Primary.TButton',
+                             command=self.add_task)
+        add_btn.grid(row=8, column=0, columnspan=2, pady=10)
+
+        # Statistics section
+        stats_frame = tk.LabelFrame(left_panel,
+                                    text="📊 Statistics",
+                                    font=('Segoe UI', 12, 'bold'),
+                                    bg=self.colors['card_bg'],
+                                    fg=self.colors['primary'],
+                                    padx=15,
+                                    pady=15)
+        stats_frame.pack(fill='x', padx=15, pady=15)
+
+        # Statistics labels
+        self.total_label = tk.Label(stats_frame,
+                                    text="Total Tasks: 0",
+                                    font=('Segoe UI', 10),
+                                    bg=self.colors['card_bg'])
+        self.total_label.pack(anchor='w', pady=5)
+
+        self.completed_label = tk.Label(stats_frame,
+                                        text="Completed: 0",
+                                        font=('Segoe UI', 10),
+                                        bg=self.colors['card_bg'])
+        self.completed_label.pack(anchor='w', pady=5)
+
+        self.pending_label = tk.Label(stats_frame,
+                                      text="Pending: 0",
+                                      font=('Segoe UI', 10),
+                                      bg=self.colors['card_bg'])
+        self.pending_label.pack(anchor='w', pady=5)
+
+        self.overdue_label = tk.Label(stats_frame,
+                                      text="Overdue: 0",
+                                      font=('Segoe UI', 10),
+                                      bg=self.colors['card_bg'])
+        self.overdue_label.pack(anchor='w', pady=5)
+
+        # Productivity quote
+        quote_frame = tk.Frame(left_panel, bg=self.colors['card_bg'])
+        quote_frame.pack(fill='x', padx=15, pady=15)
+
+        self.quote_label = tk.Label(quote_frame,
+                                    text='"The secret of getting ahead is getting started."\n- Mark Twain',
+                                    font=('Segoe UI', 9, 'italic'),
+                                    fg=self.colors['secondary'],
+                                    bg=self.colors['card_bg'],
+                                    wraplength=250,
+                                    justify='center')
+        self.quote_label.pack()
+
+        # Right panel - Task list and controls
+        right_panel = tk.Frame(main_container, bg=self.colors['card_bg'], relief='raised', bd=2)
+        right_panel.pack(side='right', fill='both', expand=True)
+
+        # Task list header
+        list_header = tk.Frame(right_panel, bg=self.colors['card_bg'])
+        list_header.pack(fill='x', padx=15, pady=(15, 5))
+
+        tk.Label(list_header,
+                 text="📋 Your Tasks",
+                 font=('Segoe UI', 14, 'bold'),
+                 fg=self.colors['primary'],
+                 bg=self.colors['card_bg']).pack(side='left')
+
+        # Filter options
+        filter_frame = tk.Frame(list_header, bg=self.colors['card_bg'])
+        filter_frame.pack(side='right')
+
+        tk.Label(filter_frame,
+                 text="Filter:",
+                 font=('Segoe UI', 9),
+                 bg=self.colors['card_bg']).pack(side='left', padx=(0, 5))
+
+        self.filter_var = tk.StringVar(value="All")
+        filter_combo = ttk.Combobox(filter_frame,
+                                    textvariable=self.filter_var,
+                                    values=["All", "Pending", "Completed", "High Priority", "Today", "Overdue"],
+                                    state="readonly",
+                                    width=15,
+                                    font=('Segoe UI', 9))
+        filter_combo.pack(side='left')
+        filter_combo.bind('<<ComboboxSelected>>', lambda e: self.filter_tasks())
+
+        # Task list with scrollbar
+        list_frame = tk.Frame(right_panel, bg=self.colors['card_bg'])
+        list_frame.pack(fill='both', expand=True, padx=15, pady=5)
+
+        # Create a Treeview for better task display
+        columns = ('status', 'task', 'priority', 'due_date', 'category')
+        self.task_tree = ttk.Treeview(list_frame,
+                                      columns=columns,
+                                      show='tree headings',
+                                      height=15)
+
+        # Define columns
+        self.task_tree.column('#0', width=0, stretch=False)
+        self.task_tree.column('status', width=50, anchor='center')
+        self.task_tree.column('task', width=300, anchor='w')
+        self.task_tree.column('priority', width=80, anchor='center')
+        self.task_tree.column('due_date', width=100, anchor='center')
+        self.task_tree.column('category', width=80, anchor='center')
+
+        # Define headings
+        self.task_tree.heading('status', text='Status')
+        self.task_tree.heading('task', text='Task')
+        self.task_tree.heading('priority', text='Priority')
+        self.task_tree.heading('due_date', text='Due Date')
+        self.task_tree.heading('category', text='Category')
+
+        # Add scrollbar
+        scrollbar = ttk.Scrollbar(list_frame, orient='vertical', command=self.task_tree.yview)
+        self.task_tree.configure(yscrollcommand=scrollbar.set)
+
+        # Pack tree and scrollbar
+        self.task_tree.pack(side='left', fill='both', expand=True)
+        scrollbar.pack(side='right', fill='y')
+
+        # Bind selection
+        self.task_tree.bind('<<TreeviewSelect>>', self.on_task_select)
+
+        # Control buttons
+        control_frame = tk.Frame(right_panel, bg=self.colors['card_bg'])
+        control_frame.pack(fill='x', padx=15, pady=15)
+
+        # Button styles
+        button_style = {'font': ('Segoe UI', 10), 'width': 12, 'height': 1}
+
+        self.mark_done_btn = ttk.Button(control_frame,
+                                        text="✅ Mark Done",
+                                        style='Success.TButton',
+                                        command=self.mark_task_done,
+                                        state='disabled')
+        self.mark_done_btn.pack(side='left', padx=5)
+
+        self.edit_btn = ttk.Button(control_frame,
+                                   text="✏️ Edit",
+                                   style='Warning.TButton',
+                                   command=self.edit_task,
+                                   state='disabled')
+        self.edit_btn.pack(side='left', padx=5)
+
+        self.delete_btn = ttk.Button(control_frame,
+                                     text="🗑️ Delete",
+                                     style='Danger.TButton',
+                                     command=self.delete_task,
+                                     state='disabled')
+        self.delete_btn.pack(side='left', padx=5)
+
+        clear_all_btn = ttk.Button(control_frame,
+                                   text="🧹 Clear All",
+                                   command=self.clear_all_tasks)
+        clear_all_btn.pack(side='left', padx=5)
+
+        # Export/Import buttons
+        export_frame = tk.Frame(right_panel, bg=self.colors['card_bg'])
+        export_frame.pack(fill='x', padx=15, pady=(0, 15))
+
+        ttk.Button(export_frame,
+                   text="📤 Export Tasks",
+                   command=self.export_tasks).pack(side='left', padx=5)
+
+        ttk.Button(export_frame,
+                   text="📥 Import Tasks",
+                   command=self.import_tasks).pack(side='left', padx=5)
+
+        # Status bar
+        self.status_bar = tk.Label(self.root,
+                                   text="Ready",
+                                   bg=self.colors['dark'],
+                                   fg='white',
+                                   font=('Segoe UI', 9),
+                                   anchor='w',
+                                   padx=10)
+        self.status_bar.pack(side='bottom', fill='x')
+
+    def add_task(self):
+        """Add a new task"""
+        task_text = self.task_entry.get("1.0", "end-1c").strip()
+
+        if not task_text:
+            messagebox.showwarning("Input Required", "Please enter a task description!")
+            return
+
+        # Create task dictionary
+        task = {
+            'id': len(self.tasks) + 1,
+            'text': task_text,
+            'priority': self.priority_var.get(),
+            'due_date': self.due_date_var.get(),
+            'category': self.category_var.get(),
+            'completed': False,
+            'created_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'completed_at': None
+        }
+
+        self.tasks.append(task)
+        self.save_tasks()
+
+        # Clear input
+        self.task_entry.delete("1.0", "end")
+
+        # Update display
+        self.load_tasks_to_listbox()
+        self.update_stats()
+
+        # Show confirmation
+        self.show_status(f"Task added: {task_text[:30]}...")
+
+        # Play success sound (optional)
+        self.root.bell()
+
+    def load_tasks_to_listbox(self):
+        """Load tasks into the treeview"""
+        # Clear existing items
+        for item in self.task_tree.get_children():
+            self.task_tree.delete(item)
+
+        # Add tasks
+        for task in self.tasks:
+            status = "✅" if task['completed'] else "⏳"
+
+            # Color coding based on priority
+            priority_color = ""
+            if task['priority'] == "High":
+                priority_color = "red"
+            elif task['priority'] == "Medium":
+                priority_color = "orange"
+            else:
+                priority_color = "green"
+
+            # Check if overdue
+            due_date = task['due_date']
+            is_overdue = False
+            if due_date and not task['completed']:
+                try:
+                    due = datetime.strptime(due_date, "%Y-%m-%d")
+                    if due.date() < datetime.now().date():
+                        is_overdue = True
+                except:
+                    pass
+
+            # Insert into tree
+            item_id = self.task_tree.insert('', 'end', values=(
+                status,
+                task['text'],
+                task['priority'],
+                task['due_date'] if task['due_date'] else "No date",
+                task['category']
+            ))
+
+            # Apply color coding
+            if task['completed']:
+                self.task_tree.item(item_id, tags=('completed',))
+            elif is_overdue:
+                self.task_tree.item(item_id, tags=('overdue',))
+            elif task['priority'] == "High":
+                self.task_tree.item(item_id, tags=('high',))
+
+        # Configure tags for colors
+        self.task_tree.tag_configure('completed', foreground='gray')
+        self.task_tree.tag_configure('overdue', foreground='red')
+        self.task_tree.tag_configure('high', foreground='red', font=('Segoe UI', 10, 'bold'))
+
+    def on_task_select(self, event):
+        """Handle task selection"""
+        selection = self.task_tree.selection()
+        if selection:
+            self.mark_done_btn.config(state='normal')
+            self.edit_btn.config(state='normal')
+            self.delete_btn.config(state='normal')
+        else:
+            self.mark_done_btn.config(state='disabled')
+            self.edit_btn.config(state='disabled')
+            self.delete_btn.config(state='disabled')
+
+    def mark_task_done(self):
+        """Mark selected task as completed"""
+        selection = self.task_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a task first!")
+            return
+
+        item = selection[0]
+        task_index = self.task_tree.index(item)
+
+        if task_index < len(self.tasks):
+            self.tasks[task_index]['completed'] = True
+            self.tasks[task_index]['completed_at'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            self.save_tasks()
+            self.load_tasks_to_listbox()
+            self.update_stats()
+            self.show_status("Task marked as completed!")
+
+    def edit_task(self):
+        """Edit selected task"""
+        selection = self.task_tree.selection()
+        if not selection:
+            return
+
+        item = selection[0]
+        task_index = self.task_tree.index(item)
+
+        if task_index < len(self.tasks):
+            task = self.tasks[task_index]
+
+            # Create edit window
+            edit_window = tk.Toplevel(self.root)
+            edit_window.title("Edit Task")
+            edit_window.geometry("400x300")
+            edit_window.configure(bg=self.colors['bg'])
+            edit_window.transient(self.root)
+            edit_window.grab_set()
+
+            # Task description
+            tk.Label(edit_window,
+                     text="Task Description:",
+                     font=('Segoe UI', 10, 'bold'),
+                     bg=self.colors['bg']).pack(anchor='w', padx=20, pady=(20, 5))
+
+            task_text = tk.Text(edit_window,
+                                height=3,
+                                width=40,
+                                font=('Segoe UI', 10))
+            task_text.pack(padx=20, pady=(0, 10))
+            task_text.insert("1.0", task['text'])
+
+            # Priority
+            tk.Label(edit_window,
+                     text="Priority:",
+                     font=('Segoe UI', 10, 'bold'),
+                     bg=self.colors['bg']).pack(anchor='w', padx=20, pady=(0, 5))
+
+            priority_var = tk.StringVar(value=task['priority'])
+            priority_frame = tk.Frame(edit_window, bg=self.colors['bg'])
+            priority_frame.pack(anchor='w', padx=20, pady=(0, 10))
+
+            for text, value in [("🔥 High", "High"), ("⚡ Medium", "Medium"), ("💡 Low", "Low")]:
+                tk.Radiobutton(priority_frame,
+                               text=text,
+                               variable=priority_var,
+                               value=value,
+                               font=('Segoe UI', 9),
+                               bg=self.colors['bg']).pack(side='left', padx=5)
+
+            # Due date
+            tk.Label(edit_window,
+                     text="Due Date:",
+                     font=('Segoe UI', 10, 'bold'),
+                     bg=self.colors['bg']).pack(anchor='w', padx=20, pady=(0, 5))
+
+            due_date_var = tk.StringVar(value=task['due_date'])
+            due_date_entry = tk.Entry(edit_window,
+                                      textvariable=due_date_var,
+                                      font=('Segoe UI', 10),
+                                      width=20)
+            due_date_entry.pack(anchor='w', padx=20, pady=(0, 20))
+
+            # Buttons
+            button_frame = tk.Frame(edit_window, bg=self.colors['bg'])
+            button_frame.pack(pady=20)
+
+            def save_edit():
+                task['text'] = task_text.get("1.0", "end-1c").strip()
+                task['priority'] = priority_var.get()
+                task['due_date'] = due_date_var.get()
+                self.save_tasks()
+                self.load_tasks_to_listbox()
+                self.update_stats()
+                edit_window.destroy()
+                self.show_status("Task updated!")
+
+            ttk.Button(button_frame,
+                       text="💾 Save Changes",
+                       style='Primary.TButton',
+                       command=save_edit).pack(side='left', padx=5)
+
+            ttk.Button(button_frame,
+                       text="❌ Cancel",
+                       command=edit_window.destroy).pack(side='left', padx=5)
+
+    def delete_task(self):
+        """Delete selected task"""
+        selection = self.task_tree.selection()
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a task first!")
+            return
+
+        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this task?"):
+            item = selection[0]
+            task_index = self.task_tree.index(item)
+
+            if task_index < len(self.tasks):
+                deleted_task = self.tasks.pop(task_index)
+                self.save_tasks()
+                self.load_tasks_to_listbox()
+                self.update_stats()
+                self.show_status(f"Deleted: {deleted_task['text'][:30]}...")
+
+    def clear_all_tasks(self):
+        """Clear all tasks"""
+        if not self.tasks:
+            return
+
+        if messagebox.askyesno("Confirm Clear", "Are you sure you want to delete ALL tasks?"):
+            self.tasks.clear()
+            self.save_tasks()
+            self.load_tasks_to_listbox()
+            self.update_stats()
+            self.show_status("All tasks cleared!")
+
+    def filter_tasks(self):
+        """Filter tasks based on selected criteria"""
+        filter_type = self.filter_var.get()
+
+        # Clear tree
+        for item in self.task_tree.get_children():
+            self.task_tree.delete(item)
+
+        # Filter tasks
+        filtered_tasks = []
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        if filter_type == "All":
+            filtered_tasks = self.tasks
+        elif filter_type == "Pending":
+            filtered_tasks = [t for t in self.tasks if not t['completed']]
+        elif filter_type == "Completed":
+            filtered_tasks = [t for t in self.tasks if t['completed']]
+        elif filter_type == "High Priority":
+            filtered_tasks = [t for t in self.tasks if t['priority'] == "High"]
+        elif filter_type == "Today":
+            filtered_tasks = [t for t in self.tasks if t['due_date'] == today]
+        elif filter_type == "Overdue":
+            filtered_tasks = []
+            for task in self.tasks:
+                if task['due_date'] and not task['completed']:
+                    try:
+                        due = datetime.strptime(task['due_date'], "%Y-%m-%d")
+                        if due.date() < datetime.now().date():
+                            filtered_tasks.append(task)
+                    except:
+                        pass
+
+        # Display filtered tasks
+        for task in filtered_tasks:
+            status = "✅" if task['completed'] else "⏳"
+            self.task_tree.insert('', 'end', values=(
+                status,
+                task['text'],
+                task['priority'],
+                task['due_date'] if task['due_date'] else "No date",
+                task['category']
+            ))
+
+        self.show_status(f"Showing {filter_type.lower()} tasks: {len(filtered_tasks)} found")
+
+    def update_stats(self):
+        """Update statistics display"""
+        total = len(self.tasks)
+        completed = len([t for t in self.tasks if t['completed']])
+        pending = total - completed
+
+        # Count overdue tasks
+        overdue = 0
+        for task in self.tasks:
+            if task['due_date'] and not task['completed']:
+                try:
+                    due = datetime.strptime(task['due_date'], "%Y-%m-%d")
+                    if due.date() < datetime.now().date():
+                        overdue += 1
+                except:
+                    pass
+
+        self.total_label.config(text=f"📊 Total Tasks: {total}")
+        self.completed_label.config(text=f"✅ Completed: {completed}")
+        self.pending_label.config(text=f"⏳ Pending: {pending}")
+        self.overdue_label.config(text=f"⚠️ Overdue: {overdue}")
+
+    def export_tasks(self):
+        """Export tasks to a file"""
+        from tkinter import filedialog
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON files", "*.json"), ("Text files", "*.txt"), ("All files", "*.*")]
+        )
+
+        if file_path:
+            try:
+                with open(file_path, 'w') as f:
+                    json.dump(self.tasks, f, indent=2)
+                self.show_status(f"Tasks exported to {file_path}")
+            except Exception as e:
+                messagebox.showerror("Export Error", f"Failed to export: {str(e)}")
+
+    def import_tasks(self):
+        """Import tasks from a file"""
+        from tkinter import filedialog
+
+        file_path = filedialog.askopenfilename(
+            filetypes=[("JSON files", "*.json"), ("Text files", "*.txt"), ("All files", "*.*")]
+        )
+
+        if file_path:
+            try:
+                with open(file_path, 'r') as f:
+                    imported_tasks = json.load(f)
+
+                if isinstance(imported_tasks, list):
+                    # Assign new IDs to imported tasks
+                    for i, task in enumerate(imported_tasks, start=len(self.tasks) + 1):
+                        task['id'] = i
+
+                    self.tasks.extend(imported_tasks)
+                    self.save_tasks()
+                    self.load_tasks_to_listbox()
+                    self.update_stats()
+                    self.show_status(f"Imported {len(imported_tasks)} tasks from {file_path}")
+                else:
+                    messagebox.showerror("Import Error", "Invalid file format!")
+            except Exception as e:
+                messagebox.showerror("Import Error", f"Failed to import: {str(e)}")
+
+    def show_status(self, message):
+        """Show status message"""
+        self.status_bar.config(text=f"✓ {message}")
+        # Clear status after 3 seconds
+        self.root.after(3000, lambda: self.status_bar.config(text="Ready"))
+
+    def load_tasks(self):
+        """Load tasks from file"""
+        if os.path.exists(self.tasks_file):
+            try:
+                with open(self.tasks_file, 'r') as f:
+                    return json.load(f)
+            except:
+                return []
+        return []
+
+    def save_tasks(self):
+        """Save tasks to file"""
+        try:
+            with open(self.tasks_file, 'w') as f:
+                json.dump(self.tasks, f, indent=2)
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Failed to save tasks: {str(e)}")
+
+
+def main():
+    root = tk.Tk()
+    app = EnhancedTodoApp(root)
+    root.mainloop()
+
+
+if __name__ == "__main__":
+    main()
