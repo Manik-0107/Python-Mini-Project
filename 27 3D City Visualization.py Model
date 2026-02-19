@@ -1,0 +1,93 @@
+# Project Name: 3D Model City using python
+# install: pip install pyvista
+
+import pyvista as pv
+import numpy as np
+
+# ------------------ SETTINGS ------------------
+np.random.seed(7)
+city_size = 10
+max_height = 35
+
+plotter = pv.Plotter(window_size=(1400, 900))
+plotter.set_background("#020617")  # night-sky tone
+
+# ------------------ ROADS ------------------
+road_width = 0.25
+for i in range(city_size + 1):
+    road_x = pv.Box(bounds=(i-road_width, i+road_width, -1, city_size+1, 0, 0.05))
+    road_y = pv.Box(bounds=(-1, city_size+1, i-road_width, i+road_width, 0, 0.05))
+    plotter.add_mesh(road_x, color="#1f2933")
+    plotter.add_mesh(road_y, color="#1f2933")
+
+# ------------------ BUILDINGS ------------------
+for i in range(city_size):
+    for j in range(city_size):
+
+        # Skip some blocks for parks
+        if np.random.rand() < 0.12:
+            park = pv.Box(bounds=(i+0.1, i+0.9, j+0.1, j+0.9, 0, 0.2))
+            plotter.add_mesh(park, color="#166534")
+            continue
+
+        # Height gradient (downtown effect)
+        d = np.sqrt((i-city_size/2)**2 + (j-city_size/2)**2)
+        height = max_height - d*3 + np.random.uniform(-3, 4)
+        height = max(5, height)
+
+        # Slight footprint variation
+        sx = np.random.uniform(0.6, 0.9)
+        sy = np.random.uniform(0.6, 0.9)
+
+        box = pv.Box(
+            bounds=(
+                i+(1-sx)/2, i+(1+sx)/2,
+                j+(1-sy)/2, j+(1+sy)/2,
+                0, height
+            )
+        )
+
+        # Realistic building color
+        r = int(np.clip(180 - height*2, 70, 180))
+        g = int(np.clip(180 - height*1.5, 80, 180))
+        b = int(np.clip(200 - height, 120, 220))
+        color = (r, g, b)
+
+        plotter.add_mesh(
+            box,
+            color=color,
+            smooth_shading=True,
+            specular=0.5,
+            specular_power=30
+        )
+
+# ------------------ GROUND ------------------
+ground = pv.Plane(
+    center=(city_size/2, city_size/2, -0.05),
+    i_size=city_size+3,
+    j_size=city_size+3
+)
+plotter.add_mesh(ground, color="#0f172a")
+
+# ------------------ LIGHTING ------------------
+plotter.enable_shadows()
+
+plotter.add_light(
+    pv.Light(position=(30, 30, 60), intensity=0.9, light_type="scene light")
+)
+
+plotter.add_light(
+    pv.Light(position=(-20, -10, 25), intensity=0.4)
+)
+
+# ------------------ CAMERA ------------------
+plotter.camera_position = [
+    (18, -25, 35),   # camera location
+    (city_size/2, city_size/2, 8),  # focal point
+    (0, 0, 1)        # up direction
+]
+
+plotter.camera.zoom(1.4)
+
+# ------------------ SHOW ------------------
+plotter.show(title="Realistic 3D City Visualization")
